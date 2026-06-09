@@ -64,7 +64,7 @@ TRANSFORM = transforms.Compose([
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Below this confidence the model says "I don't know"
-OOD_THRESHOLD = 0.40
+OOD_THRESHOLD = 0.70
 
 
 # -- Model loading --------------------------------------------
@@ -242,11 +242,11 @@ with col_pred:
 
     if is_ood:
         st.warning(
-            f"⚠️ The model is not confident this is a CIFAR-10 object "
-            f"(best guess: **{CLASS_EMOJI[top_class]} {top_class}** "
-            f"at only {top_conf:.1%}). "
-            f"Try an image of: airplane, car, bird, cat, deer, "
-            f"dog, frog, horse, ship, or truck."
+            f"⚠️ Low confidence — the model's best guess is "
+            f"**{CLASS_EMOJI[top_class]} {top_class}** at {top_conf:.1%}. "
+            f"This model only knows 10 classes: airplane, car, bird, cat, "
+            f"deer, dog, frog, horse, ship, and truck. "
+            f"Any other image will still be forced into one of these."
         )
     else:
         st.metric(
