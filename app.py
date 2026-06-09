@@ -1,5 +1,5 @@
 """
-app.py — CIFAR-10 Image Classifier
+CIFAR-10 Image Classifier
 Streamlit interface with model selector, confidence scores, and Grad-CAM overlay.
 """
 
@@ -107,9 +107,9 @@ def compute_gradcam_overlay(
     Compute Grad-CAM heatmap and overlay it on the original image.
     """
     target_layer = (
-        model.features[-1]
+        model.conv2               # last conv layer in CustomCNN
         if model_name == "Custom CNN"
-        else model.layer4[-1]
+        else model.layer4[-1].conv2  # last conv inside the last ResNet-18 block
     )
 
     try:
