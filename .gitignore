@@ -6,9 +6,10 @@ __pycache__/
 .Python
 
 # Virtual environments
-.venv/
+
 venv/
 env/
+.venv\
 
 # Model weights (large binary files — mount or download separately)
 *.pth

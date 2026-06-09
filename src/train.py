@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.cuda.amp import GradScaler, autocast
+from torch.amp import GradScaler, autocast
 import os
 from tqdm import tqdm
 from src.preprocess import load_cifar10_data
@@ -12,11 +12,11 @@ def train_model(model, trainloader, testloader, model_name, epochs=20):
     model = model.to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-    scaler = GradScaler()  # For mixed precision training
+    scaler = GradScaler('cpu')  # For mixed precision training
 
     train_losses, val_losses, val_accuracies = [], [], []
     best_val_acc = 0.0
-    os.makedirs('models', exist_ok=True)  # Ensure models/ exists
+    os.makedirs('src/models', exist_ok=True)  # Ensure src/models/ exists
 
     for epoch in range(epochs):
         model.train()
@@ -28,7 +28,7 @@ def train_model(model, trainloader, testloader, model_name, epochs=20):
             optimizer.zero_grad()
 
             # Mixed precision training
-            with autocast():
+            with autocast('cpu'):
                 outputs = model(inputs)
                 loss = criterion(outputs, labels)
 
@@ -51,7 +51,7 @@ def train_model(model, trainloader, testloader, model_name, epochs=20):
         with torch.no_grad():
             for inputs, labels in val_bar:
                 inputs, labels = inputs.to(device), labels.to(device)
-                with autocast():
+                with autocast('cpu'):
                     outputs = model(inputs)
                     loss = criterion(outputs, labels)
                 val_loss += loss.item()
@@ -71,14 +71,14 @@ def train_model(model, trainloader, testloader, model_name, epochs=20):
         if val_acc > best_val_acc:
             best_val_acc = val_acc
             try:
-                torch.save(model.state_dict(), f'models/{model_name}_best.pth')
+                torch.save(model.state_dict(), f'src/models/{model_name}_best.pth')
                 print(f'Saved best model for {model_name} with Val Acc: {val_acc:.2f}%')
             except Exception as e:
                 print(f'Error saving model: {e}')
 
     # Save final model
     try:
-        torch.save(model.state_dict(), f'models/{model_name}.pth')
+        torch.save(model.state_dict(), f'src/models/{model_name}.pth')
     except Exception as e:
         print(f'Error saving final model: {e}')
 

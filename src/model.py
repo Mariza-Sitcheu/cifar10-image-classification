@@ -25,6 +25,7 @@ class CustomCNN(nn.Module):
 
 
 def get_resnet18(pretrained=True):
-    model = models.resnet18(pretrained=pretrained)
+    weights = models.ResNet18_Weights.DEFAULT if pretrained else None
+    model = models.resnet18(weights=weights)
     model.fc = nn.Linear(model.fc.in_features, 10)  # Modify for 10 classes
     return model
