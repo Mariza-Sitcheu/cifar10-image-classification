@@ -17,7 +17,9 @@ Upload any image — the app classifies it into one of 10 CIFAR-10 categories an
 |---------|--------|
 | Models | Custom CNN (~76% accuracy) and fine-tuned ResNet-18 (~85% accuracy) |
 | Interpretability | Grad-CAM overlays on the uploaded image |
-| Confidence | Top-K predictions with probability bars |
+| Confidence | Top-K predictions with calibrated probability bars |
+| Calibration | Post-hoc temperature scaling for honest confidence scores |
+| OOD detection | Warns when the image is likely outside the 10 known classes |
 | Model selector | Switch between CNN and ResNet-18 in the sidebar |
 | Tests | 9 unit tests covering models and Grad-CAM |
 | Docker | Containerised for portable deployment |
@@ -56,7 +58,8 @@ cifar10-image-classification/
 │   ├── train.py          # Training loop with mixed precision
 │   ├── evaluate.py       # Confusion matrix and metrics
 │   ├── gradcam.py        # Reusable GradCAM class
-│   └── models/           # Saved model weights (not tracked by git)
+│   ├── calibrate.py      # Post-hoc temperature scaling calibration
+│   └── models/           # Saved model weights and temperature files
 ├── notebooks/
 │   └── cifar10_eda.ipynb # Exploratory data analysis
 ├── tests/
@@ -117,6 +120,20 @@ pytest tests/ -v
 - **ResNet-18** — pretrained on ImageNet, fine-tuned on CIFAR-10
 - Both trained for 20 epochs with Adam optimiser
 - Mixed precision training (`torch.amp`)
+
+## Calibration & OOD detection
+
+Neural networks trained with softmax are often overconfident — they assign high probabilities even to images they have never seen. This project addresses that with two techniques:
+
+**Temperature scaling** — a post-hoc calibration method that learns a single scalar T on the validation set by minimising the negative log-likelihood. Logits are divided by T before softmax, producing more honest probabilities without any retraining. Both models are calibrated (Custom CNN: T≈1.02, ResNet-18: T≈1.08).
+
+**Confidence thresholding** — if the top calibrated confidence is below 70%, the app displays an out-of-distribution warning instead of a confident prediction. This catches images that don't belong to any of the 10 CIFAR-10 classes.
+
+To re-run calibration after retraining:
+
+```bash
+python -m src.calibrate
+```
 
 ---
 
