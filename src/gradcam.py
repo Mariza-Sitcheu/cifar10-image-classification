@@ -1,125 +1,79 @@
-import os
+"""
+Grad-CAM implementation for CNN and ResNet models.
+
+Usage:
+    gcam    = GradCAM(model, target_layer)
+    heatmap = gcam.generate(input_tensor, class_idx)  # returns H×W float32 0–1
+"""
+
+import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
-import cv2
-import matplotlib.pyplot as plt
-from src.preprocess import load_cifar10_data
-from src.model import CustomCNN, get_resnet18
+from torch import Tensor
 
 
 class GradCAM:
-    def __init__(self, model, target_layer):
-        self.model = model
+    """
+    Gradient-weighted Class Activation Mapping (Grad-CAM).
+
+    Visualises the regions of an input image most relevant to a model's
+    prediction by computing the gradient of the class score with respect
+    to the feature maps of a target convolutional layer.
+
+    Reference: Selvaraju et al. (2017) https://arxiv.org/abs/1610.02391
+
+    Args:
+        model:        PyTorch model in eval mode.
+        target_layer: The convolutional layer to hook into.
+    """
+
+    def __init__(self, model: nn.Module, target_layer: nn.Module):
+        self.model        = model
         self.target_layer = target_layer
-        self.gradients = None
-        self.activations = None
+        self._activations: Tensor | None = None
+        self._gradients:   Tensor | None = None
+        self._register_hooks()
 
-        # Register hooks to capture gradients and activations
-        self.target_layer.register_forward_hook(self.save_activations)
-        self.target_layer.register_full_backward_hook(self.save_gradients)
+    def _register_hooks(self) -> None:
+        """Register forward and backward hooks on the target layer."""
+        def save_activation(_, __, output):
+            self._activations = output.detach()
 
-    def save_activations(self, module, input, output):
-        self.activations = output
+        def save_gradient(_, __, grad_output):
+            self._gradients = grad_output[0].detach()
 
-    def save_gradients(self, module, grad_in, grad_out):
-        self.gradients = grad_out[0]
+        self.target_layer.register_forward_hook(save_activation)
+        self.target_layer.register_full_backward_hook(save_gradient)
 
-    def generate(self, input_image, class_idx=None):
-        self.model.eval()
-        input_image = input_image.requires_grad_(True)
+    def generate(self, input_tensor: Tensor, class_idx: int) -> np.ndarray:
+        """
+        Generate a Grad-CAM heatmap for the given class.
 
-        # Forward pass
-        output = self.model(input_image)
-        if class_idx is None:
-            class_idx = torch.argmax(output, dim=1).item()
+        Args:
+            input_tensor: Preprocessed input tensor of shape (1, C, H, W).
+            class_idx:    Index of the target class.
 
-        # Zero gradients
+        Returns:
+            Normalised heatmap as a float32 numpy array of shape (H, W),
+            values in [0, 1].
+        """
         self.model.zero_grad()
 
-        # Backward pass for the target class
-        output[:, class_idx].backward()
+        output = self.model(input_tensor)
+        score  = output[0, class_idx]
+        score.backward()
 
-        # Compute Grad-CAM
-        pooled_gradients = torch.mean(self.gradients, dim=[0, 2, 3])
-        for i in range(self.activations.shape[1]):
-            self.activations[:, i, :, :] *= pooled_gradients[i]
+        # Global average pool the gradients over spatial dimensions
+        weights = self._gradients.mean(dim=(2, 3), keepdim=True)  # (1, C, 1, 1)
 
-        heatmap = torch.mean(self.activations, dim=1).squeeze().cpu().detach().numpy()
-        heatmap = np.maximum(heatmap, 0)
-        heatmap /= np.max(heatmap) + 1e-10  # Normalize
+        # Weighted combination of activation maps
+        cam = (weights * self._activations).sum(dim=1).squeeze()  # (H, W)
+        cam = torch.relu(cam).cpu().numpy()
 
-        return heatmap, class_idx
+        # Normalise to [0, 1]
+        if cam.max() > cam.min():
+            cam = (cam - cam.min()) / (cam.max() - cam.min())
+        else:
+            cam = np.zeros_like(cam)
 
-
-def visualize_gradcam(model, model_path, testloader, classes, model_name, num_samples=5):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.load_state_dict(torch.load(model_path, weights_only=True))
-    model = model.to(device)
-
-    # Select target layer (last convolutional layer)
-    if model_name == "custom_cnn":
-        target_layer = model.conv2  # Last conv layer in CustomCNN
-    else:
-        target_layer = model.layer4[-1]  # Last block in ResNet-18
-
-    grad_cam = GradCAM(model, target_layer)
-
-    # Get sample images
-    dataiter = iter(testloader)
-    images, labels = next(dataiter)
-    images, labels = images[:num_samples].to(device), labels[:num_samples].to(device)
-
-    for i in range(num_samples):
-        img = images[i:i + 1]  # Batch of 1
-        heatmap, pred_idx = grad_cam.generate(img)
-
-        # Denormalize image for visualization
-        img_np = img.squeeze().cpu().detach().numpy().transpose(1, 2, 0)
-        img_np = img_np * 0.5 + 0.5  # Denormalize
-        img_np = (img_np * 255).astype(np.uint8)
-
-        # Resize heatmap to match image size
-        heatmap = cv2.resize(heatmap, (32, 32))
-        heatmap = (heatmap * 255).astype(np.uint8)
-        heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
-
-        # Overlay heatmap on original image
-        overlay = cv2.addWeighted(img_np, 0.5, heatmap, 0.5, 0)
-
-        # Plot original, heatmap, and overlay
-        plt.figure(figsize=(12, 4))
-
-        plt.subplot(1, 3, 1)
-        plt.imshow(img_np)
-        plt.title(f'Original\nTrue: {classes[labels[i]]}')
-        plt.axis('off')
-
-        plt.subplot(1, 3, 2)
-        plt.imshow(heatmap)
-        plt.title('Grad-CAM Heatmap')
-        plt.axis('off')
-
-        plt.subplot(1, 3, 3)
-        plt.imshow(overlay)
-        plt.title(f'Overlay\nPred: {classes[pred_idx]}')
-        plt.axis('off')
-
-        plt.suptitle(f'Grad-CAM - {model_name} Sample {i + 1}')
-        os.makedirs('figures', exist_ok=True)  # Ensure figures/ exists
-        plt.savefig(f'figures/gradcam_{model_name}_sample_{i + 1}.png')
-        plt.close()
-
-
-if __name__ == "__main__":
-    # Load data
-    _, testloader, classes = load_cifar10_data()
-
-    # Generate Grad-CAM for custom CNN
-    custom_cnn = CustomCNN()
-    visualize_gradcam(custom_cnn, "models/custom_cnn.pth", testloader, classes, "custom_cnn")
-
-    # Generate Grad-CAM for ResNet-18
-    resnet18 = get_resnet18(pretrained=True)
-    visualize_gradcam(resnet18, "models/resnet18.pth", testloader, classes, "resnet18")
+        return cam.astype(np.float32)
