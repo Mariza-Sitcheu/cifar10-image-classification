@@ -129,13 +129,12 @@ Neural networks trained with softmax are often overconfident — they assign hig
 
 **Confidence thresholding** — if the top calibrated confidence is below 70%, the app displays an out-of-distribution warning instead of a confident prediction. This catches images that don't belong to any of the 10 CIFAR-10 classes.
 
-**Before calibration** — raw softmax probabilities are overconfident:
+**Reliability diagrams — before and after calibration:**
 
 ![Before calibration](figures/before_calibration.png)
-
-**After calibration** — temperature scaling produces more honest probabilities:
-
 ![After calibration](figures/after_calbration.png)
+
+Both models were already reasonably well-calibrated (T≈1.02 for Custom CNN, T≈1.08 for ResNet-18), so the visual difference is small. Temperature scaling has the most impact on models trained with aggressive regularisation or label smoothing, where logits tend to be more extreme. The calibration step is kept in the pipeline as good practice for any future retraining.
 
 To re-run calibration after retraining:
 
