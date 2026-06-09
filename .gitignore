@@ -14,11 +14,10 @@ env/
 env\
 
 # Model weights (large binary files — mount or download separately)
-*.pth
+# *.pth — temporarily tracked so Streamlit Cloud can load them
 *.pt
 *.ckpt
 models/
-src/models/
 
 # Dataset (downloaded automatically by PyTorch)
 data/
