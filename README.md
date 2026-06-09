@@ -129,6 +129,14 @@ Neural networks trained with softmax are often overconfident — they assign hig
 
 **Confidence thresholding** — if the top calibrated confidence is below 70%, the app displays an out-of-distribution warning instead of a confident prediction. This catches images that don't belong to any of the 10 CIFAR-10 classes.
 
+**Before calibration** — raw softmax probabilities are overconfident:
+
+![Before calibration](figures/before_calibration.png)
+
+**After calibration** — temperature scaling produces more honest probabilities:
+
+![After calibration](figures/after_calbration.png)
+
 To re-run calibration after retraining:
 
 ```bash
