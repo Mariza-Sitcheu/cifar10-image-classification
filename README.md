@@ -1,114 +1,128 @@
-# CIFAR-10 Image Classification
-A deep learning project for classifying CIFAR-10 images using PyTorch on an NVIDIA RTX 4060 GPU. Features a custom CNN (70–80% accuracy) and fine-tuned ResNet-18 (85–90% accuracy), with exploratory data analysis (EDA), model evaluation, Grad-CAM for interpretability, and a Streamlit web app for interactive predictions.
-Features
+# 🔍 CIFAR-10 Image Classifier
 
-Data Preprocessing: Loads CIFAR-10 dataset with PyTorch DataLoaders.
-EDA: Visualizes sample images and class distribution (figures/sample\_images.png, figures/class\_distribution.png).
-Models: Custom CNN and ResNet-18, trained with mixed precision.
-Training: trains the models with 20 epochs
-Evaluation: Confusion matrices and sample predictions (figures/confusion\_matrix\_*.png, figures/sample\_predictions\_*.png).
-Grad-CAM: Visualizes model attention with heatmaps (figures/gradcam\_\*.png).
-Streamlit App: Interactive web interface for image classification (app.py).
+> Deep learning image classifier with Grad-CAM interpretability — built with PyTorch and Streamlit.
 
-___
+[![CI](https://github.com/Mariza-Sitcheu/cifar10-image-classification/actions/workflows/ci.yml/badge.svg)](https://github.com/Mariza-Sitcheu/cifar10-image-classification/actions)
 
-## 🗂️Repository Structure
+---
+
+## What it does
+
+Upload any image — the app classifies it into one of 10 CIFAR-10 categories and shows **where the model is looking** via Grad-CAM heatmaps.
+
+| Feature | Detail |
+|---------|--------|
+| Models | Custom CNN (~76% accuracy) and fine-tuned ResNet-18 (~85% accuracy) |
+| Interpretability | Grad-CAM overlays on the uploaded image |
+| Confidence | Top-K predictions with probability bars |
+| Model selector | Switch between CNN and ResNet-18 in the sidebar |
+| Tests | 9 unit tests covering models and Grad-CAM |
+| Docker | Containerised for portable deployment |
+
+---
+
+## Results
+
+| Model | Test accuracy |
+|-------|--------------|
+| Custom CNN | ~76% |
+| ResNet-18 (fine-tuned) | ~85% |
+
+**App screenshots:**
+
+![Custom CNN](figures/example_cat.png)
+![ResNet-18](figures/example_cat_resnet18.png)
+![Car - Custom CNN](figures/example_car.png)
+![Car - ResNet-18](figures/example_car_resnet18.png)
+
+**Data visualisations:**
+
+![Sample Images](figures/sample_images.png)
+![Class Distribution](figures/class_distribution.png)
+![Grad-CAM](src/figures/gradcam_custom_cnn_sample_4.png)
+
+---
+
+## Repository structure
+
 ```
-cifar10-image-classiffication/
-├── notebooks/               # Jupyter notebooks
-│   └── cifar10\_eda.ipynb    # EDA visualizations
-├── src/                     # Python scripts
-│   ├── preprocess.py        # Data loading
-│   ├── model.py             # Model definitions
-│   ├── train.py             # Training
-│   ├── evaluate.py          # Model evaluation
-│   ├── gradcam.py           # Grad-CAM visualizations
-├── models/                  # Trained model weights
-│   ├── custom\_cnn.pth       # Custom CNN weights
-│   ├── custom\_cnn\_best.pth  # Best custom CNN weights
-│   ├── resnet18.pth         # ResNet-18 weights
-│   ├── resnet18\_best.pth    # Best ResNet-18 weights
-├── figures/                 # Visualizations
-│   ├── sample\_images.png    # Sample CIFAR-10 images
-│   ├── class\_distribution.png  # Class distribution histogram
-│   ├── gradcam\_\*.png        # Grad-CAM heatmaps
-├── app.py                   # Streamlit app
-├── requirements.txt         # Dependencies
-├── README.md                # Project documentation
-
-___
+cifar10-image-classification/
+├── src/
+│   ├── model.py          # CustomCNN and ResNet-18 definitions
+│   ├── preprocess.py     # CIFAR-10 data loading
+│   ├── train.py          # Training loop with mixed precision
+│   ├── evaluate.py       # Confusion matrix and metrics
+│   ├── gradcam.py        # Reusable GradCAM class
+│   └── models/           # Saved model weights (not tracked by git)
+├── notebooks/
+│   └── cifar10_eda.ipynb # Exploratory data analysis
+├── tests/
+│   └── test_model.py     # Unit tests (pytest)
+├── figures/              # Saved visualisations
+├── app.py                # Streamlit application
+├── Dockerfile            # Container definition
+├── requirements.txt      # Python dependencies
+└── .github/workflows/
+    └── ci.yml            # GitHub Actions CI pipeline
 ```
-## ⚙️ Installation
+
+---
+
+## Quickstart
+
+**Prerequisites:** Python 3.11+
+
 ```bash
-Clone the Repository:
-git clone https://github.com/Mariza-Sitcheu/cifar10-image-classification.git
+# 1. Clone
+git clone https://github.com/Mariza-Sitcheu/cifar10-image-classification
 cd cifar10-image-classification
 
-Create Virtual Environment (Python 3.11 recommended):
-python -m venv .venv 
-.venv\\Scripts\\activate  # Windows
-source .venv/bin/activate  # Linux/Mac
+# 2. Create and activate virtual environment
+python -m venv .venv
+.venv\Scripts\activate        # Windows
+source .venv/bin/activate     # Linux/Mac
 
-Install Dependencies:
+# 3. Install dependencies (CPU)
 pip install -r requirements.txt
 
-Key dependencies:
+# For GPU (CUDA 12.1):
+# pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
-torch==2.5.1+cu121
-torchvision==0.20.1+cu121
-streamlit==1.36.0
-matplotlib==3.8.4
-opencv-python==4.10.0.84
-tqdm==4.66.5
-```
-## 🚀Usage
-```bash
-Exploratory Data Analysis:
-jupyter notebook notebooks/cifar10\_eda.ipynb
+# 4. Train models (~10–20 min each)
+python -m src.train
 
-Generates figures/sample\_images.png and figures/class\_distribution.png.
-
-Train Models:
-python src/train.py
-
-Trains custom CNN and ResNet-18, saves weights to models/ Runtime: ~10–20 minutes per model on RTX 4060.
-
-Evaluate Models:
-python src/evaluate.py
-
-Generates figures/confusion\_matrix\_*.png, figures/sample\_predictions\_*.png.
-
-Grad-CAM Visualizations:
-python src/gradcam.py
-
-Produces figures/gradcam\_\*.png showing model attention heatmaps.
-
-Run Streamlit App:
+# 5. Run the app
 streamlit run app.py
-
-Opens a web interface at http://localhost:8501 for image classification.
 ```
 
-
-## 📈Results
+**With Docker:**
+```bash
+docker build -t cifar10-classifier .
+docker run -p 8501:8501 -v $(pwd)/src/models:/app/src/models cifar10-classifier
 ```
-Custom CNN: ~70–80% test accuracy.
-ResNet-18: ~85–90% test accuracy.
-Visualizations:
+
+**Run tests:**
+```bash
+pytest tests/ -v
 ```
-![Sample Images](figures/sample_images.png)
 
-![Class Distribution](figures/class_distribution.png)
+---
 
-![Description de l'image](src/figures/gradcam_custom_cnn_sample_4.png)
+## Training details
 
+- **Custom CNN** — 2 conv blocks with batch norm and dropout, trained from scratch
+- **ResNet-18** — pretrained on ImageNet, fine-tuned on CIFAR-10
+- Both trained for 20 epochs with Adam optimiser
+- Mixed precision training (`torch.amp`)
 
+---
 
+## Tech stack
 
-## 🧪 Requirements
-```
-Python (3.12 recommended)
-NVIDIA GPU with CUDA 12.1 (e.g., RTX 4060)
-PyTorch 2.5.1 with CUDA support
-Streamlit for web app
-```
+PyTorch · torchvision · Streamlit · Grad-CAM · OpenCV · scikit-learn · Docker · GitHub Actions
+
+---
+
+## Author
+
+**Mariza Sitcheu** · [GitHub](https://github.com/Mariza-Sitcheu)
