@@ -3,8 +3,11 @@
 > Deep learning image classifier with Grad-CAM interpretability — built with PyTorch and Streamlit.
 
 [![CI](https://github.com/Mariza-Sitcheu/cifar10-image-classification/actions/workflows/ci.yml/badge.svg)](https://github.com/Mariza-Sitcheu/cifar10-image-classification/actions)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Streamlit-FF4B4B?logo=streamlit)](https://cifar10-image-classification-app.streamlit.app/)
 
 ---
+
+## 🚀 [Try the live app](https://cifar10-image-classification-app.streamlit.app/)
 
 ## What it does
 

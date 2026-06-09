@@ -3,6 +3,7 @@ CIFAR-10 Image Classifier
 Streamlit interface with model selector, confidence scores, and Grad-CAM overlay.
 """
 
+import json
 import numpy as np
 import cv2
 import streamlit as st
@@ -40,6 +41,20 @@ MODEL_ACCURACY = {
     "ResNet-18":  "~88% test accuracy",
 }
 
+TEMPERATURE_PATHS = {
+    "Custom CNN": "src/models/custom_cnn_temperature.json",
+    "ResNet-18":  "src/models/resnet18_temperature.json",
+}
+
+
+def load_temperature(model_name: str) -> float:
+    """Load calibrated temperature T. Defaults to 1.0 if not found."""
+    path = TEMPERATURE_PATHS[model_name]
+    if Path(path).exists():
+        with open(path) as f:
+            return json.load(f)["temperature"]
+    return 1.0  # uncalibrated — no scaling
+
 TRANSFORM = transforms.Compose([
     transforms.Resize((32, 32)),
     transforms.ToTensor(),
@@ -47,6 +62,9 @@ TRANSFORM = transforms.Compose([
 ])
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Below this confidence the model says "I don't know"
+OOD_THRESHOLD = 0.40
 
 
 # -- Model loading --------------------------------------------
@@ -79,14 +97,16 @@ def predict(
     model: torch.nn.Module,
     image: Image.Image,
     top_k: int = 3,
+    temperature: float = 1.0,
 ) -> list[tuple[str, float]]:
     """
     Run inference and return top-k predictions with confidence scores.
+    Logits are divided by temperature before softmax for calibrated probabilities.
     """
     tensor = TRANSFORM(image).unsqueeze(0).to(DEVICE)
     with torch.no_grad():
         logits = model(tensor)
-        probs  = F.softmax(logits, dim=1).squeeze()
+        probs  = F.softmax(logits / temperature, dim=1).squeeze()
 
     top_probs, top_idxs = torch.topk(probs, top_k)
     return [
@@ -171,11 +191,13 @@ with st.sidebar:
 
     st.divider()
     st.caption(f"Running on: `{'GPU' if DEVICE.type == 'cuda' else 'CPU'}`")
+    st.caption(f"Temperature: `T = {load_temperature(model_name):.2f}`")
 
 # -- Load model --------------------------------------------
 
 with st.spinner(f"Loading {model_name}..."):
     model = load_model(model_name)
+    temperature = load_temperature(model_name)
 
 if model is None:
     st.error(
@@ -201,9 +223,10 @@ if uploaded is None:
 image = Image.open(uploaded).convert("RGB")
 
 with st.spinner("Classifying..."):
-    predictions = predict(model, image, top_k=top_k)
+    predictions = predict(model, image, top_k=top_k, temperature=temperature)
 
 top_class, top_conf = predictions[0]
+is_ood = top_conf < OOD_THRESHOLD
 
 # -- Layout: image | predictions | gradcam --------------------------------------------
 
@@ -216,11 +239,22 @@ with col_img:
 
 with col_pred:
     st.subheader("Predictions")
-    st.metric(
-        label="Top prediction",
-        value=f"{CLASS_EMOJI[top_class]} {top_class}",
-        delta=f"{top_conf:.1%} confidence",
-    )
+
+    if is_ood:
+        st.warning(
+            f"⚠️ The model is not confident this is a CIFAR-10 object "
+            f"(best guess: **{CLASS_EMOJI[top_class]} {top_class}** "
+            f"at only {top_conf:.1%}). "
+            f"Try an image of: airplane, car, bird, cat, deer, "
+            f"dog, frog, horse, ship, or truck."
+        )
+    else:
+        st.metric(
+            label="Top prediction",
+            value=f"{CLASS_EMOJI[top_class]} {top_class}",
+            delta=f"{top_conf:.1%} confidence",
+        )
+
     st.divider()
 
     for i, (cls, conf) in enumerate(predictions):
@@ -234,7 +268,9 @@ with col_pred:
 
 with col_cam:
     st.subheader("Grad-CAM")
-    if show_gradcam:
+    if is_ood:
+        st.info("Grad-CAM is not shown for uncertain predictions.")
+    elif show_gradcam:
         with st.spinner("Computing Grad-CAM..."):
             class_idx = CLASSES.index(top_class)
             overlay   = compute_gradcam_overlay(model, model_name, image, class_idx)
@@ -247,12 +283,12 @@ with col_cam:
             )
         else:
             st.warning("Grad-CAM failed for this image. Try another.")
-    else:
+    elif not is_ood:
         st.info("Enable Grad-CAM in the sidebar to see model attention.")
 
 # -- Full confidence table --------------------------------------------
 
 with st.expander("Full confidence scores — all 10 classes"):
-    all_preds = predict(model, image, top_k=10)
+    all_preds = predict(model, image, top_k=10, temperature=temperature)
     for cls, conf in all_preds:
         st.progress(conf, text=f"{CLASS_EMOJI[cls]} {cls}: {conf:.2%}")
