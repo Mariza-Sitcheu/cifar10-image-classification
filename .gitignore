@@ -6,22 +6,36 @@ __pycache__/
 .Python
 
 # Virtual environments
-
-venv/
-env/
+.venv/
 .venv\
+venv/
+venv\
+env/
+env\
 
 # Model weights (large binary files — mount or download separately)
 *.pth
 *.pt
 *.ckpt
+models/
+src/models/
+
+# Dataset (downloaded automatically by PyTorch)
+data/
 
 # Jupyter
 .ipynb_checkpoints/
 
-# OS
-.DS_Store
+# OS — Windows
 Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# OS — macOS
+.DS_Store
 
 # IDE
 .vscode/
@@ -29,6 +43,9 @@ Thumbs.db
 
 # Streamlit
 .streamlit/
+
+# Pytest
+.pytest_cache/
 
 # Logs & temp
 *.log
